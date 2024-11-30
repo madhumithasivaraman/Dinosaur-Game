@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrome Dinosaur Game</title>
+
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+            background-color: white;
+        }
+        #board {
+            background-color: #f7f7f7;
+            border: 2px solid black;
+            margin: auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+   
+    <canvas id="board"></canvas>
+
+    <script>
+        //board
+        let board;
+        let boardWidth = 750;
+        let boardHeight = 250;
+        let context;
+
+        //dino
+        let dinoWidth = 44;
+        let dinoHeight = 47;
+        let dinoX = 50;
+        let dinoY = boardHeight - dinoHeight;
+        let dinoImg;
+        let dinoDeadImg;
+
+        let dino = {
+            x: dinoX,
+            y: dinoY,
+            width: dinoWidth,
+            height: dinoHeight
+        };
+
+        //cactus
+        let cactusArray = [];
+        let cactus1Width = 17;
+        let cactus2Width = 34;
+        let cactus3Width = 51;
+        let cactusHeight = 35;
+        let cactusX = boardWidth;
+        let cactusY = boardHeight - cactusHeight;
+        let cactus1Img, cactus2Img, cactus3Img;
+
+        //physics
+        let velocityX = -8; // Adjusted to match Chrome's game speed
+        let velocityY = 0;
+        let gravity = 0.6; // Adjusted gravity for better jump physics
+        let jumpHeight = -12; // Adjusted jump height for a more accurate jump
+        let gameOver = false;
+        let score = 0;
+
+        window.onload = function () {
+            board = document.getElementById("board");
+            board.height = boardHeight;
+            board.width = boardWidth;
+
+            context = board.getContext("2d");
+
+            // Load images
+            dinoImg = new Image();
+            dinoImg.src = "dino.png";
+
+            dinoDeadImg = new Image();
+            dinoDeadImg.src = "dino-dead.png";
+
+            cactus1Img = new Image();
+            cactus1Img.src = "cactus1.png";
+
+            cactus2Img = new Image();
+            cactus2Img.src = "cactus2.png";
+
+            cactus3Img = new Image();
+            cactus3Img.src = "cactus3.png";
+
+            startGame();
+        };
+
+        function startGame() {
+            gameOver = false;
+            score = 0;
+            velocityX = -8; // Reset speed
+            cactusArray = []; // Clear cactus array
+
+            requestAnimationFrame(update);
+            setInterval(placeCactus, 1500); // Add cactus every 1.5 seconds
+            document.addEventListener("keydown", moveDino);
+            document.addEventListener("click", checkClick);
+        }
+
+        function update() {
+            requestAnimationFrame(update);
+            if (gameOver) {
+                context.fillStyle = "grey";
+                context.font = "40px Arial";
+                context.fillText("GAME OVER", boardWidth / 2 - 120, boardHeight / 2);
+                return;
+            }
+            context.clearRect(0, 0, board.width, board.height);
+
+            // Apply gravity
+            velocityY += gravity;
+            dino.y = Math.min(dino.y + velocityY, dinoY); // Apply gravity but don't exceed ground
+            context.drawImage(dinoImg, dino.x, dino.y, dino.width, dino.height);
+
+            // Move and draw cactuses
+            for (let i = 0; i < cactusArray.length; i++) {
+                let cactus = cactusArray[i];
+                cactus.x += velocityX;
+                context.drawImage(cactus.img, cactus.x, cactus.y, cactus.width, cactus.height);
+
+                // Detect collision
+                if (detectCollision(dino, cactus)) {
+                    gameOver = true;
+                    dinoImg = dinoDeadImg;
+                }
+            }
+
+            // Remove off-screen cactuses
+            if (cactusArray.length > 0 && cactusArray[0].x + cactusArray[0].width < 0) {
+                cactusArray.shift();
+            }
+
+            // Draw score
+            context.fillStyle = "black";
+            context.font = "20px Arial";
+            score++;
+            context.fillText("Score: " + score, 5, 20);
+        }
+
+        function moveDino(e) {
+            if (gameOver) {
+                return;
+            }
+
+            if ((e.code == "Space" || e.code == "ArrowUp") && dino.y == dinoY) {
+                // Jump
+                velocityY = jumpHeight;
+            }
+        }
+
+        function checkClick(e) {
+            if (gameOver) {
+                return;
+            }
+
+            // Get the bounding box of the canvas
+            let rect = board.getBoundingClientRect();
+            let mouseX = e.clientX - rect.left;
+            let mouseY = e.clientY - rect.top;
+
+            // Check if the click is within the dinosaur's area
+            if (mouseX >= dino.x && mouseX <= dino.x + dino.width &&
+                mouseY >= dino.y && mouseY <= dino.y + dino.height) {
+                if (dino.y == dinoY) {
+                    // Jump
+                    velocityY = jumpHeight;
+                }
+            }
+        }
+
+        function placeCactus() {
+            if (gameOver) {
+                return;
+            }
+
+            // Place cactus
+            let cactus = {
+                img: null,
+                x: cactusX,
+                y: cactusY,
+                width: null,
+                height: cactusHeight
+            };
+
+            let placeCactusChance = Math.random();
+
+            if (placeCactusChance > 0.9) {
+                cactus.img = cactus3Img;
+                cactus.width = cactus3Width;
+            } else if (placeCactusChance > 0.7) {
+                cactus.img = cactus2Img;
+                cactus.width = cactus2Width;
+            } else {
+                cactus.img = cactus1Img;
+                cactus.width = cactus1Width;
+            }
+
+            cactusArray.push(cactus);
+        }
+
+        function detectCollision(a, b) {
+            return a.x < b.x + b.width &&
+                a.x + a.width > b.x &&
+                a.y < b.y + b.height &&
+                a.y + a.height > b.y;
+        }
+    </script>
+</body>
+</html>
